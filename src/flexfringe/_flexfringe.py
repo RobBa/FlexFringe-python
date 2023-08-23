@@ -1,4 +1,4 @@
-import os
+import os, sys
 import subprocess
 import shutil
 import time
@@ -12,6 +12,7 @@ from pandas import DataFrame
 from tempfile import NamedTemporaryFile
 import warnings
 from loguru import logger
+import json
 
 logger.disable("flexfringe")
 
@@ -178,9 +179,12 @@ class FlexFringe:
             .apply(lambda x: [float(val) for val in x.strip().strip("[").strip("]").split(",")])
 
         # And the rest of the score columns
-        df['sum scores'] = df['sum scores'].astype(float)
-        df['mean scores'] = df['mean scores'].astype(float)
-        df['min score'] = df['min score'].astype(float)
+        #try:
+        #    df['sum scores'] = df['sum scores'].astype(float)
+        #    df['mean scores'] = df['mean scores'].astype(float)
+        #    df['min score'] = df['min score'].astype(float)
+        #except:
+        #    pass # nothing to do here
 
         return df
 
@@ -196,9 +200,17 @@ class FlexFringe:
         logger.debug(f"Running: {' '.join(full_cmd)}")
         result = subprocess.run([self.path] + command, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, universal_newlines=True)
+        
+        # print output to console
+        for outstr in result.stdout:
+            sys.stdout.write(outstr)
+        for outstr in result.stderr:
+            sys.stderr.write(outstr)
+
         logger.debug(f"Flexfringe exit code: {result.returncode}")
         logger.info(f"Flexfringe stdout:\n{result.stdout}")
         logger.info(f"Flexfringe stderr:\n{result.stderr}")
+
 
     def show(self, format="png"):
         """
@@ -228,6 +240,39 @@ class FlexFringe:
 
             # Need to give it time to open image viewer :/
             time.sleep(1)
+
+    def get_alphabet(self):
+        """Extracts the alphabet from the json-output we got from training the state machine.
+
+        Raises:
+            RuntimeError: json file not found
+
+        Returns:
+            dict(): Dictionary mapping str()-type to int (same as in flexfringe)
+        """
+        try:
+            json_content = json.load(open(self.json_out, "rt"))
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Json file not found: {e.filename}. Did you fit flexfringe already?")
+        alphabet = {key: i for i, key in enumerate(json_content["alphabet"])}
+        return alphabet
+    
+    def get_types(self):
+        """Extracts the types from the json-output we got from training the state machine.
+
+        Raises:
+            RuntimeError: json file not found
+
+        Returns:
+            dict(): Dictionary mapping str()-type to int (same as in flexfringe)
+        """
+        try:
+            json_content = json.load(open(self.json_out, "rt"))
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Json file not found: {e.filename}. Did you fit flexfringe already?")
+        types = {key: i for i, key in enumerate(json_content["types"])}
+        return types
+
 
     def _format_kwargs(self, **kwargs):
         """
